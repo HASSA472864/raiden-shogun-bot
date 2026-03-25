@@ -291,7 +291,7 @@ def start_health_server():
 def keep_alive():
     """Ping our own health endpoint every 10 minutes to prevent spin-down."""
     import time
-    url = os.getenv("RENDER_EXTERNAL_URL", "")
+    url = os.getenv("RENDER_EXTERNAL_URL", "https://raiden-shogun-bot-0iuq.onrender.com")
     if not url:
         print("No RENDER_EXTERNAL_URL set — keep-alive disabled.")
         return
