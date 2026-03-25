@@ -2,7 +2,9 @@ import discord
 import google.generativeai as genai
 import json
 import os
+import asyncio
 import threading
+import urllib.request
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from datetime import datetime
 from pathlib import Path
@@ -191,9 +193,9 @@ async def get_raiden_response(user_id: int, username: str,
     memory.add_message(user_id, username, display_name, "user", message)
 
     try:
-        # Start chat with history
+        # Start chat with history (run blocking Gemini call in thread)
         chat = model.start_chat(history=history)
-        response = chat.send_message(context_note)
+        response = await asyncio.to_thread(chat.send_message, context_note)
         reply = response.text
 
         # Save bot response to memory
@@ -285,6 +287,23 @@ def start_health_server():
     server.serve_forever()
 
 
+# ==================== KEEP-ALIVE PINGER (prevents Render free tier sleep) ====================
+def keep_alive():
+    """Ping our own health endpoint every 10 minutes to prevent spin-down."""
+    import time
+    url = os.getenv("RENDER_EXTERNAL_URL", "")
+    if not url:
+        print("No RENDER_EXTERNAL_URL set — keep-alive disabled.")
+        return
+    print(f"Keep-alive pinger started for {url}")
+    while True:
+        time.sleep(600)  # 10 minutes
+        try:
+            urllib.request.urlopen(url, timeout=10)
+        except Exception:
+            pass
+
+
 # ==================== RUN ====================
 if __name__ == "__main__":
     if DISCORD_TOKEN == "YOUR_DISCORD_TOKEN_HERE":
@@ -301,5 +320,9 @@ if __name__ == "__main__":
     # Start health check server in background thread (for Render)
     health_thread = threading.Thread(target=start_health_server, daemon=True)
     health_thread.start()
+
+    # Start keep-alive pinger to prevent Render free tier spin-down
+    keepalive_thread = threading.Thread(target=keep_alive, daemon=True)
+    keepalive_thread.start()
 
     client.run(DISCORD_TOKEN)
