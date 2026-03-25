@@ -2,6 +2,8 @@ import discord
 import google.generativeai as genai
 import json
 import os
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from datetime import datetime
 from pathlib import Path
 
@@ -264,17 +266,40 @@ async def on_message(message: discord.Message):
                 await message.channel.send(chunk)
 
 
+# ==================== HEALTH CHECK SERVER (for Render free tier) ====================
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain")
+        self.end_headers()
+        self.wfile.write(b"Raiden Shogun is watching over Inazuma.")
+
+    def log_message(self, format, *args):
+        pass  # Suppress logs
+
+
+def start_health_server():
+    port = int(os.getenv("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), HealthHandler)
+    print(f"Health check server running on port {port}")
+    server.serve_forever()
+
+
 # ==================== RUN ====================
 if __name__ == "__main__":
     if DISCORD_TOKEN == "YOUR_DISCORD_TOKEN_HERE":
-        print("❌ Please set your DISCORD_TOKEN!")
+        print("Please set your DISCORD_TOKEN!")
         print("   Edit bot.py or set the DISCORD_TOKEN environment variable.")
         exit(1)
 
     if GEMINI_API_KEY == "YOUR_GEMINI_API_KEY_HERE":
-        print("❌ Please set your GEMINI_API_KEY!")
+        print("Please set your GEMINI_API_KEY!")
         print("   Get one free at: https://aistudio.google.com/apikey")
         print("   Edit bot.py or set the GEMINI_API_KEY environment variable.")
         exit(1)
+
+    # Start health check server in background thread (for Render)
+    health_thread = threading.Thread(target=start_health_server, daemon=True)
+    health_thread.start()
 
     client.run(DISCORD_TOKEN)
