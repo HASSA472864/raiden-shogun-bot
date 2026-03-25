@@ -1,0 +1,10 @@
+services:
+  - type: worker
+    name: raiden-shogun-bot
+    runtime: docker
+    plan: free
+    envVars:
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
